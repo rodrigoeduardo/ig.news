@@ -3,9 +3,21 @@ import Head from 'next/head';
 import { getPrismicClient } from '../../services/prismic';
 import styles from './styles.module.scss';
 
+import { RichText } from 'prismic-dom';
 import Prismic from '@prismicio/client';
 
-export default function Posts() {
+type Post = {
+    slug: string,
+    title: string,
+    excerpt: string,
+    updatedAt: string
+}
+
+interface PostsProps {
+    postsArray: Post[]
+}
+
+export default function Posts({ postsArray }: PostsProps) {
     return (
         <>
             <Head>
@@ -14,27 +26,13 @@ export default function Posts() {
 
             <main className={styles.container}>
                 <div className={styles.posts}>
-                    <a href="">
-                        <time>11 de abril de 2021</time>
-                        <strong>Mapas com React usando Leaflet</strong>
-                        <p>Neste post vamos desenvolver uma página web
-                        para demonstrar, na prática, a integração de
-                        Mapas em uma aplicação com React usando Leaflet.</p>
-                    </a>
-                    <a href="">
-                        <time>11 de abril de 2021</time>
-                        <strong>Mapas com React usando Leaflet</strong>
-                        <p>Neste post vamos desenvolver uma página web
-                        para demonstrar, na prática, a integração de
-                        Mapas em uma aplicação com React usando Leaflet.</p>
-                    </a>
-                    <a href="">
-                        <time>11 de abril de 2021</time>
-                        <strong>Mapas com React usando Leaflet</strong>
-                        <p>Neste post vamos desenvolver uma página web
-                        para demonstrar, na prática, a integração de
-                        Mapas em uma aplicação com React usando Leaflet.</p>
-                    </a>
+                    { postsArray.map(post => (
+                        <a key={post.slug} href="#">
+                            <time>{post.updatedAt}</time>
+                            <strong>{post.title}</strong>
+                            <p>{post.excerpt}</p>
+                        </a>
+                    )) }
                 </div>
             </main>
         </>
@@ -51,9 +49,20 @@ export const getStaticProps: GetStaticProps = async () => {
         pageSize: 100
     })
 
-    console.log(response)
+    const postsArray = response.results.map(post => {
+        return {
+            slug: post.uid,
+            title: RichText.asText(post.data.title),
+            excerpt: post.data.content.find(content => content.type === 'paragraph')?.text ?? '',
+            updatedAt: new Date(post.last_publication_date).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            })
+        }
+    })
 
     return {
-        props: {}
+        props: {postsArray}
     }
 }
