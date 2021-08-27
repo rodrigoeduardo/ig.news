@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { Readable } from 'stream';
 import Stripe from "stripe";
 import { stripe } from "../../services/stripe";
+import { saveSubscription } from "./_lib/manageSubscription";
 
 async function buffer(readable: Readable) {
     const chunks = [];
@@ -22,7 +23,9 @@ export const config = {
 }
 
 const relevantEvents = new Set([
-    'checkout.session.completed'
+    'checkout.session.completed',
+    'customer.subscriptions.updated',
+    'customer.subscriptions.deleted',
 ])
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
@@ -43,8 +46,26 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
         if (relevantEvents.has(type)) {
             try {
                 switch (type) {
-                    case 'checkout.session.completed':
+                    case 'customer.subscription.deleted':
+                    case 'customer.subscription.updated':
+                        const subscription = event.data.object as Stripe.Subscription;
+
+                        await saveSubscription(
+                            subscription.id,
+                            subscription.customer.toString(),
+                            false
+                        );
                         
+                        break;
+                    case 'checkout.session.completed':
+                        const checkoutSession = event.data.object as Stripe.Checkout.Session;
+                        
+                        await saveSubscription(
+                            checkoutSession.subscription.toString(),
+                            checkoutSession.customer.toString(),
+                            true
+                        )
+
                         break;
                     default:
                         throw new Error('Unhandled event.')
@@ -59,5 +80,4 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
         res.setHeader('Allow', 'POST');
         res.status(405).end('Method not allowed');
     }
-    
 }
